@@ -8,8 +8,8 @@ type Member struct {
 
 func (m Member) CheckIfBookIsBorrowedByMember(bookID int) bool {
 
-	for borrowedBook := range m.BorrowedBooks {
-		if borrowedBook == bookID{
+	for _, book := range m.BorrowedBooks {
+		if book.ID == bookID {
 			return true
 		}
 	}
@@ -17,16 +17,24 @@ func (m Member) CheckIfBookIsBorrowedByMember(bookID int) bool {
 	return false
 }
 
-func (m *Member) RemoveBookFromMemberBorrowList(bookID int){
-	idx := 0
+func (m *Member) RemoveBookFromMemberBorrowList(bookID int) {
+	if len(m.BorrowedBooks) == 0 {
+		return
+	}
 
-	for borrowedBook := range m.BorrowedBooks {
-		if borrowedBook == bookID{
+	idx := -1
+
+	for i, book := range m.BorrowedBooks {
+		if book.ID == bookID {
+			idx = i
 			break
 		}
-		idx += 1
 	}
-	
+
+	if idx == -1 {
+		return
+	}
+
 	m.BorrowedBooks[idx] = m.BorrowedBooks[len(m.BorrowedBooks)-1]
 	m.BorrowedBooks = m.BorrowedBooks[:len(m.BorrowedBooks)-1]
 

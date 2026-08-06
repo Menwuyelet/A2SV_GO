@@ -6,4 +6,3 @@ type Book struct {
 	Author string
 	Status string
 }
-

@@ -2,13 +2,13 @@ package models
 
 import (
 	"errors"
+	"fmt"
 )
 
 type Library struct {
 	books map[int]Book
 	members map[int]Member
 }
-
 
 func (l *Library) AddBook(book Book) {
 	l.books[book.ID] = book
@@ -18,47 +18,51 @@ func (l *Library) RemoveBook(bookID int) {
 	delete(l.books, bookID)
 }
 
+func (l *Library) AddMember(member Member) {
+	l.members[member.ID] = member
+}
+
 func (l *Library) BorrowBook(bookID int, memberID int) error {
-	if _, ok := l.books[bookID]; !ok || l.books[bookID].Status != "Available" {
-		return errors.New("The book you'r looking for is not available.")
+	if _, exists := l.books[bookID]; !exists || l.books[bookID].Status != "Available" {
+		return errors.New("The requested book is not available.")
+	}
+
+	member, err := l.RetrieveMember(memberID)
+	if err != nil {
+		return err
 	}
 
 	book := l.books[bookID]
 	book.Status = "Borrowed"
-
-	member, ok := l.RetrieveMember(memberID)
-
-	if ok == nil{
-		return errors.New("There is no member with the provided id")
-	}
+	l.books[bookID] = book
 
 	member.BorrowedBooks = append(member.BorrowedBooks, book)
-	
+	l.members[memberID] = member
+
 	return nil
 }
 
 func (l *Library) ReturnBook(bookID, memberID int) error {
-	member, ok := l.RetrieveMember(memberID)
-
-	if ok == nil {
-		return errors.New("There is no member with provided id")
+	member, err := l.RetrieveMember(memberID)
+	if err != nil {
+		return err
 	}
 
-	_, existsInLibrary := l.books[bookID]
-	borrowedByMember := member.CheckIfBookIsBorrowedByMember(bookID)
+	book, existsInLibrary := l.books[bookID]
 
-	if !existsInLibrary{
-		return errors.New("The book you're trying to return is not borrowed from this library.")
+	if !existsInLibrary {
+		return errors.New("The book you are trying to return is not in this library.")
 	}
 
-	if borrowedByMember {
-		return errors.New("The book you're trying to return is not borrowed by the member.")
+	if !member.CheckIfBookIsBorrowedByMember(bookID) {
+		return errors.New("The book you are trying to return is not borrowed by the member.")
 	}
 
-	book := l.books[bookID]
 	book.Status = "Available"
+	l.books[bookID] = book
 
 	member.RemoveBookFromMemberBorrowList(bookID)
+	l.members[memberID] = member
 
 	return nil
 }
@@ -67,44 +71,40 @@ func (l Library) ListAvailableBooks() []Book {
 	books := []Book{}
 
 	for _, book := range l.books {
-		books = append(books, book)
+		if book.Status == "Available" {
+			books = append(books, book)
+		}
 	}
+
 	return books
 }
 
-func (l Library) ListBorrowedBooks(memberID int) ([]Book, error) {
+func (l Library) ListBorrowedBooks(memberID int) []Book {
 
-	member, ok := l.RetrieveMember(memberID)
-	
-	if ok != nil {
-		return []Book{}, errors.New("There is no member with given id")
+	member, err := l.RetrieveMember(memberID)
+	if err != nil {
+		fmt.Println(err)
+		return []Book{}
 	}
+	books := l.ListBorrowedBooksForMember(member)
 
-	borrowedBooks := l.ListBorrowedBooksForMember(member)
-
-	books := []Book{}
-	for _,book := range borrowedBooks {
-		books = append(books, book)
-	}
-	return books, nil
+	return books
 }
 
 func (l Library) RetrieveMember(memberID int) (Member, error) {
-	members := []Member{}
-	
-	for _, member := range l.members{
-		if memberID == member.ID{
-			return member, nil
-		}
-		members = append(members, member)
+	member, ok := l.members[memberID]
+	if !ok {
+		return Member{}, errors.New("There is no member with this id.")
 	}
-	member := Member{}
-	return member, errors.New("There is no member with this id.")
+	
+	return member, nil
 }
 
-func (l Library) ListBorrowedBooksForMember(member Member)[]Book {
+func (l Library) ListBorrowedBooksForMember(member Member) []Book {
 	return member.BorrowedBooks
 }
 
-var LibraryInstance = &Library{}
-
+var LibraryInstance = &Library{
+	books:   make(map[int]Book),
+	members: make(map[int]Member),
+}
