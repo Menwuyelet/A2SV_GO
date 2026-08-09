@@ -1,15 +1,46 @@
 package models
 
+import (
+	"context"
+	"log"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+)
+
 type Task struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	DueDate     string `json:"due_date"`
-	Status      string `json:"status"`
+	ID          bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Title       string        `json:"title"`
+	Description string        `json:"description"`
+	DueDate     string        `json:"due_date"`
+	Status      string        `json:"status"`
 }
 
-var Tasks = []Task{
-	{ID: "1", Title: "Task 1", Description: "First task", DueDate: "2026-10-11", Status: "Pending"},
-	{ID: "2", Title: "Task 2", Description: "Second task", DueDate: "2026-10-11", Status: "In Progress"},
-	{ID: "3", Title: "Task 3", Description: "Third task", DueDate: "2026-10-11", Status: "Completed"},
+// handles db connection 
+var DB *mongo.Database
+
+func DBconnect(mongoURI string) (*mongo.Client, error) {
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	clientOptions := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPI)
+
+	client, err := mongo.Connect(clientOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := client.Ping(context.TODO(), nil); err != nil {
+		return nil, err
+	}
+
+	log.Println("Connected to MongoDB")
+
+	DB = client.Database("task_management_api")
+
+	return client, nil
+}
+
+// handles collection accessing
+func GetCollection(name string) *mongo.Collection {
+	return DB.Collection(name)
 }

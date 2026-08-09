@@ -1,72 +1,113 @@
 package data
 
 import (
+	"context"
 	"errors"
 	"task_manager/models"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-func AddTask(task models.Task) string {
-	newTask := task
+var collection *mongo.Collection
 
-	models.Tasks = append(models.Tasks, newTask)
-
-	return "Success"
+func InitCollection(c *mongo.Collection) {
+	collection = c
 }
 
-func ListTasks() []models.Task {
-	return models.Tasks
+func AddTask(task models.Task) (models.Task, error) {
+	if task.ID.IsZero() {
+		task.ID = bson.NewObjectID()
+	}
+
+	_, err := collection.InsertOne(context.TODO(), task)
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	return task, nil
+}
+
+func ListTasks() ([]models.Task, error) {
+	var tasks []models.Task
+
+	cursor, err := collection.Find(context.TODO(), bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.TODO())
+
+	if err := cursor.All(context.TODO(), &tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 func GetTask(id string) (models.Task, error) {
-	for _, task := range models.Tasks {
-		if task.ID == id {
-			return task, nil
-		}
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return models.Task{}, err
 	}
-	err := errors.New("Not found.")
-	return models.Task{}, err
+
+	var task models.Task
+
+	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&task)
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	return task, nil
 }
 
 func UpdateTask(id string, updatedTask models.Task) (models.Task, error) {
-	for idx, task := range models.Tasks {
-
-		if task.ID == id {
-			if updatedTask.Title != "" {
-
-				models.Tasks[idx].Title = updatedTask.Title
-			}
-			if updatedTask.Description != "" {
-
-				models.Tasks[idx].Description = updatedTask.Description
-			}
-			if updatedTask.DueDate != "" {
-
-				models.Tasks[idx].DueDate = updatedTask.DueDate
-			}
-			if updatedTask.Status != "" {
-
-				models.Tasks[idx].Status = updatedTask.Status
-			}
-
-			return models.Tasks[idx], nil
-		}
-
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return models.Task{}, err
 	}
 
-	err := errors.New("Task not found")
+	set := bson.M{}
+	if updatedTask.Title != "" {
+		set["title"] = updatedTask.Title
+	}
+	if updatedTask.Description != "" {
+		set["description"] = updatedTask.Description
+	}
+	if updatedTask.DueDate != "" {
+		set["due_date"] = updatedTask.DueDate
+	}
+	if updatedTask.Status != "" {
+		set["status"] = updatedTask.Status
+	}
 
-	return models.Task{}, err
+	if len(set) == 0 {
+		return models.Task{}, errors.New("no fields to update")
+	}
+
+	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objectID}, bson.M{"$set": set})
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	var task models.Task
+	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&task)
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	return task, nil
 }
 
-func DeleteTask(id string) string {
-
-	for i, val := range models.Tasks {
-		if val.ID == id {
-			models.Tasks = append(models.Tasks[:i], models.Tasks[i+1:]...)
-			return "Success"
-		}
+func DeleteTask(id string) error {
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return err
 	}
 
-	return "Failed"
+	_, err = collection.DeleteOne(context.TODO(), bson.M{"_id": objectID})
+	if err != nil {
+		return err
+	}
 
+	return nil
 }

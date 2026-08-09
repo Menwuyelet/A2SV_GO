@@ -16,18 +16,21 @@ func AddTask(ctx *gin.Context) {
 		return
 	}
 
-	status := data.AddTask(newTask)
-
-	if status != "Success" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Bad Request."})
+	task, err := data.AddTask(newTask)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create task."})
 		return
 	}
 
-	ctx.IndentedJSON(http.StatusCreated, newTask)
+	ctx.IndentedJSON(http.StatusCreated, task)
 }
 
 func ListAllTasks(ctx *gin.Context) {
-	tasks := data.ListTasks()
+	tasks, err := data.ListTasks()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list tasks."})
+		return
+	}
 
 	ctx.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
@@ -35,9 +38,9 @@ func ListAllTasks(ctx *gin.Context) {
 func RetrieveTask(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	task, status := data.GetTask(id)
+	task, err := data.GetTask(id)
 
-	if status != nil {
+	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"message": "Task not found"})
 		return
 	}
@@ -55,9 +58,9 @@ func UpdateTask(ctx *gin.Context) {
 		return
 	}
 
-	task, status := data.UpdateTask(id, updatedTask)
+	task, err := data.UpdateTask(id, updatedTask)
 
-	if status != nil {
+	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"message": "Task not found"})
 		return
 	}
@@ -68,12 +71,10 @@ func UpdateTask(ctx *gin.Context) {
 func DeleteTask(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	status := data.DeleteTask(id)
-
-	if status != "Success" {
+	if err := data.DeleteTask(id); err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"message": "Task not found"})
 		return
 	}
 
-	ctx.JSON(http.StatusNoContent, gin.H{"message": "Tasks deleted."})
+	ctx.JSON(http.StatusNoContent, gin.H{"message": "Task deleted successfully."})
 }
