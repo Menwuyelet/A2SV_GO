@@ -9,6 +9,7 @@ import (
 	"task_manager/utils"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type UserService struct {
@@ -24,6 +25,10 @@ func (us *UserService) Register(ctx context.Context, req dto.RegisterRequest) (d
 
 	if err == nil {
 		return dto.UserResponse{}, errors.New("Email already taken.")
+	}
+
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return dto.UserResponse{}, err
 	}
 
 	hashedPassword, err := utils.HashPassword(req.Password)

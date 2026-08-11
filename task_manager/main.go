@@ -31,11 +31,13 @@ func main() {
 	}
 	defer client.Disconnect(context.TODO())
 
-	taskRepo := data.NewMongoTaskRepository(repository.GetTaskCollection())
+	taskRepo := repository.NewMongoTaskRepository(repository.GetTaskCollection())
 
-	taskController := controllers.NewTaskController(taskRepo)
+	taskService := data.NewTaskService(taskRepo)
 
-	userRepo := repository.NewMongoUserRepository(repository.GetTaskCollection())
+	taskController := controllers.NewTaskController(*taskService)
+
+	userRepo := repository.NewMongoUserRepository(repository.GetUserCollection())
 
 	userService := data.NewUserService(userRepo)
 

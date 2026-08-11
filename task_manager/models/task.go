@@ -10,4 +10,5 @@ type Task struct {
 	Description string        `json:"description"`
 	DueDate     string        `json:"due_date"`
 	Status      string        `json:"status"`
+	Owner       bson.ObjectID `json:"owner"`
 }

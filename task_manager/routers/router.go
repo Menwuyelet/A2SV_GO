@@ -19,7 +19,7 @@ func StartRoute(c *Controllers) *gin.Engine {
 	protected.Use(middleware.AuthMiddleware())
 	RegisterTaskRoutes(protected, c.Task)
 
-	public := router.Group("api/")
+	public := router.Group("/api")
 	RegisterUserRoutes(public, c.User)
 	return router
 }

@@ -3,71 +3,142 @@ package data
 import (
 	"context"
 	"errors"
+	"task_manager/dto"
 	"task_manager/models"
+	"task_manager/repository"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-type MongoTaskRepository struct {
-	collection *mongo.Collection
+type TaskService struct {
+	repo repository.TaskRepository
 }
 
-func NewMongoTaskRepository(c *mongo.Collection) *MongoTaskRepository {
-	return &MongoTaskRepository{
-		collection: c,
-	}
+var ErrUnauthorized = errors.New("unauthorized")
+
+func NewTaskService(repo repository.TaskRepository) *TaskService {
+	return &TaskService{repo: repo}
 }
 
-func (r *MongoTaskRepository) AddTask(ctx context.Context, task models.Task) (models.Task, error) {
-	if task.ID.IsZero() {
-		task.ID = bson.NewObjectID()
-	}
+func (ts *TaskService) AddTask(ctx context.Context, task dto.TaskRequest, owner string) (dto.TaskResponse, error) {
+	id := bson.NewObjectID()
+	status := "PENDING"
+	ownerId, err := bson.ObjectIDFromHex(owner)
 
-	_, err := r.collection.InsertOne(ctx, task)
 	if err != nil {
-		return models.Task{}, err
+		return dto.TaskResponse{}, err
 	}
 
-	return task, nil
+	newTask := models.Task{
+		ID:          id,
+		Title:       task.Title,
+		Description: task.Description,
+		DueDate:     task.DueDate,
+		Status:      status,
+		Owner:       ownerId,
+	}
+
+	_, err = ts.repo.Create(ctx, newTask)
+
+	if err != nil {
+		return dto.TaskResponse{}, err
+	}
+
+	result := dto.TaskResponse{
+		ID:          id,
+		Title:       task.Title,
+		Description: task.Description,
+		DueDate:     task.DueDate,
+		Status:      status,
+	}
+	return result, nil
 }
 
-func (r *MongoTaskRepository) ListTasks(ctx context.Context) ([]models.Task, error) {
-	var tasks []models.Task
-
-	cursor, err := r.collection.Find(ctx, bson.M{})
+func (ts *TaskService) ListTasks(ctx context.Context, owner string) ([]dto.TaskResponse, error) {
+	ownerID, err := bson.ObjectIDFromHex(owner)
 	if err != nil {
 		return nil, err
 	}
+
+	var tasks []models.Task
+
+	cursor, err := ts.repo.List(ctx, ownerID)
+
+	if err != nil {
+		return nil, err
+	}
+
 	defer cursor.Close(ctx)
 
 	if err := cursor.All(ctx, &tasks); err != nil {
 		return nil, err
 	}
 
-	return tasks, nil
-}
+	retTasks := []dto.TaskResponse{}
 
-func (r *MongoTaskRepository) GetTask(ctx context.Context, id string) (models.Task, error) {
+	for _, task := range tasks {
+		newTask := dto.TaskResponse{
+			ID:          task.ID,
+			Title:       task.Title,
+			Description: task.Description,
+			DueDate:     task.DueDate,
+			Status:      task.Status,
+		}
+		retTasks = append(retTasks, newTask)
+	}
+	return retTasks, nil
+}
+func (ts *TaskService) GetTask(ctx context.Context, id string, owner string) (dto.TaskResponse, error) {
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
-		return models.Task{}, err
+		return dto.TaskResponse{}, err
+	}
+
+	ownerID, err := bson.ObjectIDFromHex(owner)
+	if err != nil {
+		return dto.TaskResponse{}, err
 	}
 
 	var task models.Task
 
-	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&task)
+	task, err = ts.repo.Get(ctx, objectID)
 	if err != nil {
-		return models.Task{}, err
+		return dto.TaskResponse{}, err
 	}
 
-	return task, nil
+	if task.Owner != ownerID {
+		return dto.TaskResponse{}, ErrUnauthorized
+	}
+
+	retTask := dto.TaskResponse{
+		ID:          task.ID,
+		Title:       task.Title,
+		Description: task.Description,
+		DueDate:     task.DueDate,
+		Status:      task.Status,
+	}
+
+	return retTask, nil
 }
 
-func (r *MongoTaskRepository) UpdateTask(ctx context.Context, id string, updatedTask models.Task) (models.Task, error) {
+func (ts *TaskService) UpdateTask(ctx context.Context, id string, owner string, updatedTask dto.TaskUpdateRequest) (dto.TaskResponse, error) {
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
-		return models.Task{}, err
+		return dto.TaskResponse{}, err
+	}
+
+	ownerID, err := bson.ObjectIDFromHex(owner)
+	if err != nil {
+		return dto.TaskResponse{}, err
+	}
+
+	task, err := ts.repo.Get(ctx, objectID)
+	if err != nil {
+		return dto.TaskResponse{}, err
+	}
+
+	if task.Owner != ownerID {
+		return dto.TaskResponse{}, ErrUnauthorized
 	}
 
 	set := bson.M{}
@@ -85,32 +156,61 @@ func (r *MongoTaskRepository) UpdateTask(ctx context.Context, id string, updated
 	}
 
 	if len(set) == 0 {
-		return models.Task{}, errors.New("no fields to update")
+		return dto.TaskResponse{}, errors.New("no fields to update")
 	}
 
-	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": objectID}, bson.M{"$set": set})
+	stat, err := ts.repo.Update(ctx, objectID, set)
 	if err != nil {
-		return models.Task{}, err
+		return dto.TaskResponse{}, err
 	}
 
-	var task models.Task
-	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&task)
-	if err != nil {
-		return models.Task{}, err
+	if stat {
+		task, err = ts.repo.Get(ctx, objectID)
+		if err != nil {
+			return dto.TaskResponse{}, err
+		}
+
+		retTask := dto.TaskResponse{
+			ID:          task.ID,
+			Title:       task.Title,
+			Description: task.Description,
+			DueDate:     task.DueDate,
+			Status:      task.Status,
+		}
+
+		return retTask, nil
 	}
 
-	return task, nil
+	return dto.TaskResponse{}, errors.New("task not found")
 }
 
-func (r *MongoTaskRepository) DeleteTask(ctx context.Context, id string) error {
+func (ts *TaskService) DeleteTask(ctx context.Context, id string, owner string) error {
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return err
 	}
 
-	_, err = r.collection.DeleteOne(ctx, bson.M{"_id": objectID})
+	ownerID, err := bson.ObjectIDFromHex(owner)
 	if err != nil {
 		return err
+	}
+
+	task, err := ts.repo.Get(ctx, objectID)
+	if err != nil {
+		return err
+	}
+
+	if task.Owner != ownerID {
+		return ErrUnauthorized
+	}
+
+	deleted, err := ts.repo.Delete(ctx, objectID)
+	if err != nil {
+		return err
+	}
+
+	if !deleted {
+		return errors.New("task not found")
 	}
 
 	return nil
