@@ -9,18 +9,22 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-var collection *mongo.Collection
-
-func InitCollection(c *mongo.Collection) {
-	collection = c
+type MongoTaskRepository struct {
+	collection *mongo.Collection
 }
 
-func AddTask(task models.Task) (models.Task, error) {
+func NewMongoTaskRepository(c *mongo.Collection) *MongoTaskRepository {
+	return &MongoTaskRepository{
+		collection: c,
+	}
+}
+
+func (r *MongoTaskRepository) AddTask(ctx context.Context, task models.Task) (models.Task, error) {
 	if task.ID.IsZero() {
 		task.ID = bson.NewObjectID()
 	}
 
-	_, err := collection.InsertOne(context.TODO(), task)
+	_, err := r.collection.InsertOne(ctx, task)
 	if err != nil {
 		return models.Task{}, err
 	}
@@ -28,23 +32,23 @@ func AddTask(task models.Task) (models.Task, error) {
 	return task, nil
 }
 
-func ListTasks() ([]models.Task, error) {
+func (r *MongoTaskRepository) ListTasks(ctx context.Context) ([]models.Task, error) {
 	var tasks []models.Task
 
-	cursor, err := collection.Find(context.TODO(), bson.M{})
+	cursor, err := r.collection.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(context.TODO())
+	defer cursor.Close(ctx)
 
-	if err := cursor.All(context.TODO(), &tasks); err != nil {
+	if err := cursor.All(ctx, &tasks); err != nil {
 		return nil, err
 	}
 
 	return tasks, nil
 }
 
-func GetTask(id string) (models.Task, error) {
+func (r *MongoTaskRepository) GetTask(ctx context.Context, id string) (models.Task, error) {
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return models.Task{}, err
@@ -52,7 +56,7 @@ func GetTask(id string) (models.Task, error) {
 
 	var task models.Task
 
-	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&task)
+	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&task)
 	if err != nil {
 		return models.Task{}, err
 	}
@@ -60,7 +64,7 @@ func GetTask(id string) (models.Task, error) {
 	return task, nil
 }
 
-func UpdateTask(id string, updatedTask models.Task) (models.Task, error) {
+func (r *MongoTaskRepository) UpdateTask(ctx context.Context, id string, updatedTask models.Task) (models.Task, error) {
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return models.Task{}, err
@@ -84,13 +88,13 @@ func UpdateTask(id string, updatedTask models.Task) (models.Task, error) {
 		return models.Task{}, errors.New("no fields to update")
 	}
 
-	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": objectID}, bson.M{"$set": set})
+	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": objectID}, bson.M{"$set": set})
 	if err != nil {
 		return models.Task{}, err
 	}
 
 	var task models.Task
-	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&task)
+	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&task)
 	if err != nil {
 		return models.Task{}, err
 	}
@@ -98,13 +102,13 @@ func UpdateTask(id string, updatedTask models.Task) (models.Task, error) {
 	return task, nil
 }
 
-func DeleteTask(id string) error {
+func (r *MongoTaskRepository) DeleteTask(ctx context.Context, id string) error {
 	objectID, err := bson.ObjectIDFromHex(id)
 	if err != nil {
 		return err
 	}
 
-	_, err = collection.DeleteOne(context.TODO(), bson.M{"_id": objectID})
+	_, err = r.collection.DeleteOne(ctx, bson.M{"_id": objectID})
 	if err != nil {
 		return err
 	}

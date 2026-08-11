@@ -2,13 +2,21 @@ package controllers
 
 import (
 	"net/http"
-	"task_manager/data"
 	"task_manager/models"
+	"task_manager/repository"
 
 	"github.com/gin-gonic/gin"
 )
 
-func AddTask(ctx *gin.Context) {
+type TaskController struct {
+	repo repository.TaskRepository
+}
+
+func NewTaskController(repo repository.TaskRepository) *TaskController {
+	return &TaskController{repo: repo}
+}
+
+func (tc *TaskController) AddTask(ctx *gin.Context) {
 	var newTask models.Task
 
 	if err := ctx.ShouldBindJSON(&newTask); err != nil {
@@ -16,7 +24,7 @@ func AddTask(ctx *gin.Context) {
 		return
 	}
 
-	task, err := data.AddTask(newTask)
+	task, err := tc.repo.AddTask(ctx.Request.Context(), newTask)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create task."})
 		return
@@ -25,8 +33,8 @@ func AddTask(ctx *gin.Context) {
 	ctx.IndentedJSON(http.StatusCreated, task)
 }
 
-func ListAllTasks(ctx *gin.Context) {
-	tasks, err := data.ListTasks()
+func (tc *TaskController) ListAllTasks(ctx *gin.Context) {
+	tasks, err := tc.repo.ListTasks(ctx.Request.Context())
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list tasks."})
 		return
@@ -35,10 +43,10 @@ func ListAllTasks(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 
-func RetrieveTask(ctx *gin.Context) {
+func (tc *TaskController) RetrieveTask(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	task, err := data.GetTask(id)
+	task, err := tc.repo.GetTask(ctx.Request.Context(), id)
 
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"message": "Task not found"})
@@ -48,7 +56,7 @@ func RetrieveTask(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"task": task})
 }
 
-func UpdateTask(ctx *gin.Context) {
+func (tc *TaskController) UpdateTask(ctx *gin.Context) {
 	id := ctx.Param("id")
 
 	var updatedTask models.Task
@@ -58,7 +66,7 @@ func UpdateTask(ctx *gin.Context) {
 		return
 	}
 
-	task, err := data.UpdateTask(id, updatedTask)
+	task, err := tc.repo.UpdateTask(ctx.Request.Context(), id, updatedTask)
 
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"message": "Task not found"})
@@ -68,10 +76,10 @@ func UpdateTask(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"task": task})
 }
 
-func DeleteTask(ctx *gin.Context) {
+func (tc *TaskController) DeleteTask(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	if err := data.DeleteTask(id); err != nil {
+	if err := tc.repo.DeleteTask(ctx.Request.Context(), id); err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"message": "Task not found"})
 		return
 	}

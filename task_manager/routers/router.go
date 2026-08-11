@@ -2,16 +2,24 @@ package routers
 
 import (
 	"task_manager/controllers"
+	"task_manager/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
-func StartRoute(router *gin.Engine) {
+type Controllers struct {
+	Task *controllers.TaskController
+	User *controllers.UserController
+}
 
-	router.POST("/tasks", controllers.AddTask)
-	router.GET("/tasks", controllers.ListAllTasks)
-	router.GET("/tasks/:id", controllers.RetrieveTask)
-	router.PUT("/tasks/:id", controllers.UpdateTask)
-	router.DELETE("/tasks/:id", controllers.DeleteTask)
+func StartRoute(c *Controllers) *gin.Engine {
+	router := gin.Default()
 
+	protected := router.Group("/api")
+	protected.Use(middleware.AuthMiddleware())
+	RegisterTaskRoutes(protected, c.Task)
+
+	public := router.Group("api/")
+	RegisterUserRoutes(public, c.User)
+	return router
 }
