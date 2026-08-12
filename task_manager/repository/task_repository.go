@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"task_manager/models"
+	"task_manager/Domain/models"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"

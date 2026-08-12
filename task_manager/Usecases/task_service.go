@@ -1,10 +1,10 @@
-package data
+package Usecases
 
 import (
 	"context"
 	"errors"
-	"task_manager/dto"
-	"task_manager/models"
+	"task_manager/Domain/dto"
+	"task_manager/Domain/models"
 	"task_manager/repository"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -45,7 +45,7 @@ func (ts *TaskService) AddTask(ctx context.Context, task dto.TaskRequest, owner 
 	}
 
 	result := dto.TaskResponse{
-		ID:          id,
+		ID:          id.Hex(),
 		Title:       task.Title,
 		Description: task.Description,
 		DueDate:     task.DueDate,
@@ -78,7 +78,7 @@ func (ts *TaskService) ListTasks(ctx context.Context, owner string) ([]dto.TaskR
 
 	for _, task := range tasks {
 		newTask := dto.TaskResponse{
-			ID:          task.ID,
+			ID:          task.ID.Hex(),
 			Title:       task.Title,
 			Description: task.Description,
 			DueDate:     task.DueDate,
@@ -111,7 +111,7 @@ func (ts *TaskService) GetTask(ctx context.Context, id string, owner string) (dt
 	}
 
 	retTask := dto.TaskResponse{
-		ID:          task.ID,
+		ID:          task.ID.Hex(),
 		Title:       task.Title,
 		Description: task.Description,
 		DueDate:     task.DueDate,
@@ -171,7 +171,7 @@ func (ts *TaskService) UpdateTask(ctx context.Context, id string, owner string, 
 		}
 
 		retTask := dto.TaskResponse{
-			ID:          task.ID,
+			ID:          task.ID.Hex(),
 			Title:       task.Title,
 			Description: task.Description,
 			DueDate:     task.DueDate,

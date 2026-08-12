@@ -5,13 +5,25 @@ import (
 	"log"
 	"os"
 
-	"task_manager/controllers"
-	"task_manager/data"
+	"task_manager/Delivery/controllers"
+	"task_manager/Delivery/routers"
+	"task_manager/Usecases"
 	"task_manager/repository"
-	"task_manager/routers"
 
 	"github.com/joho/godotenv"
 )
+
+func setupTaskController() *controllers.TaskController {
+	repo := repository.NewMongoTaskRepository(repository.GetTaskCollection())
+	service := Usecases.NewTaskService(repo)
+	return controllers.NewTaskController(service)
+}
+
+func setupUserController() *controllers.UserController {
+	repo := repository.NewMongoUserRepository(repository.GetUserCollection())
+	service := Usecases.NewUserService(repo)
+	return controllers.NewUserController(service)
+}
 
 func main() {
 	// loads .env
@@ -31,21 +43,21 @@ func main() {
 	}
 	defer client.Disconnect(context.TODO())
 
-	taskRepo := repository.NewMongoTaskRepository(repository.GetTaskCollection())
+	// taskRepo := repository.NewMongoTaskRepository(repository.GetTaskCollection())
 
-	taskService := data.NewTaskService(taskRepo)
+	// taskService := Usecases.NewTaskService(taskRepo)
 
-	taskController := controllers.NewTaskController(*taskService)
+	// taskController := controllers.NewTaskController(taskService)
 
-	userRepo := repository.NewMongoUserRepository(repository.GetUserCollection())
+	// userRepo := repository.NewMongoUserRepository(repository.GetUserCollection())
 
-	userService := data.NewUserService(userRepo)
+	// userService := Usecases.NewUserService(userRepo)
 
-	userController := controllers.NewUserController(userService)
+	// userController := controllers.NewUserController(userService)
 
 	allControllers := &routers.Controllers{
-		Task: taskController,
-		User: userController,
+		Task: setupTaskController(),
+		User: setupUserController(),
 	}
 
 	// handles routers

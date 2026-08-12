@@ -3,17 +3,17 @@ package controllers
 import (
 	"errors"
 	"net/http"
-	"task_manager/data"
-	"task_manager/dto"
+	"task_manager/Domain/dto"
+	"task_manager/Usecases"
 
 	"github.com/gin-gonic/gin"
 )
 
 type TaskController struct {
-	service data.TaskService
+	service *Usecases.TaskService
 }
 
-func NewTaskController(service data.TaskService) *TaskController {
+func NewTaskController(service *Usecases.TaskService) *TaskController {
 	return &TaskController{service: service}
 }
 
@@ -69,7 +69,7 @@ func (tc *TaskController) RetrieveTask(ctx *gin.Context) {
 
 	task, err := tc.service.GetTask(ctx.Request.Context(), id, ownerID.(string))
 	if err != nil {
-		if errors.Is(err, data.ErrUnauthorized) {
+		if errors.Is(err, Usecases.ErrUnauthorized) {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Unauthorized user."})
 			return
 		}
@@ -99,7 +99,7 @@ func (tc *TaskController) UpdateTask(ctx *gin.Context) {
 	task, err := tc.service.UpdateTask(ctx.Request.Context(), id, owner.(string), updatedTask)
 
 	if err != nil {
-		if errors.Is(err, data.ErrUnauthorized) {
+		if errors.Is(err, Usecases.ErrUnauthorized) {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized user."})
 			return
 		}
@@ -121,7 +121,7 @@ func (tc *TaskController) DeleteTask(ctx *gin.Context) {
 
 	err := tc.service.DeleteTask(ctx, id, owner.(string))
 	if err != nil {
-		if errors.Is(err, data.ErrUnauthorized) {
+		if errors.Is(err, Usecases.ErrUnauthorized) {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized user."})
 			return
 		}

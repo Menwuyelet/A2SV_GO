@@ -2,7 +2,8 @@ package repository
 
 import (
 	"context"
-	"task_manager/models"
+	"errors"
+	"task_manager/Domain/models"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -36,6 +37,9 @@ func (u *MongoUserRepository) FindByEmail(ctx context.Context, email string) (mo
 	err := u.collection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return models.User{}, ErrNotFound
+		}
 		return models.User{}, err
 	}
 

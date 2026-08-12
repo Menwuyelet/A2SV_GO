@@ -1,8 +1,8 @@
 package routers
 
 import (
-	"task_manager/controllers"
-	"task_manager/middleware"
+	"task_manager/Delivery/controllers"
+	"task_manager/Infrastructure/middleware"
 
 	"github.com/gin-gonic/gin"
 )

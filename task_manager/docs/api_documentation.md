@@ -2,10 +2,13 @@
 
 A complete set of REST API endpoints for managing tasks in a task management system. It covers the full lifecycle of a task including creation, retrieval, updating, and deletion. Users authenticate via **JWT Bearer tokens** to access the task endpoints, and each task is scoped to the user who created it. Task data is persisted in **MongoDB**.
 
+The project follows a **Clean Architecture** structure (`Delivery` → `Usecases` → `repository` → `Domain`), uses the **Gin** web framework, **bcrypt** for password hashing, and the official MongoDB Go driver (v2).
+
 **Base URL:** `http://localhost:8080`
 **Authentication:** JWT Bearer token (required for all task endpoints)
-**Database:** MongoDB (connection configured via environment variable)
+**Database:** MongoDB — database `task_management_api`, collections `task` and `user`
 **Token Lifetime:** 15 minutes
+**Web Framework:** [Gin](https://github.com/gin-gonic/gin)
 
 ---
 
@@ -14,6 +17,7 @@ A complete set of REST API endpoints for managing tasks in a task management sys
 - [Prerequisites](#prerequisites)
 - [Environment Setup](#environment-setup)
 - [Installation & Running the Project](#installation--running-the-project)
+- [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Authentication](#authentication)
 - [Objects](#objects)
@@ -54,17 +58,18 @@ The project uses environment variables to configure its MongoDB connection and t
 2. Open `.env` and set the variables to match your environment:
 ```env
    MONGO_URI=mongodb://localhost:27017/task-manager
-   SECRETE_KEY=your-random-secret-key
+   SECRET_KEY=your-random-secret-key
 ```
 
-   | Variable       | Required | Description                                                                                |
-   |----------------|----------|----------------------------------------------------------------------------------------------|
-   | `MONGO_URI`    | Yes      | The connection string used to connect to your MongoDB database (local or hosted).            |
-   | `SECRETE_KEY`  | Yes      | The secret used to sign and verify JSON Web Tokens. Use a long, random value.                |
+   | Variable      | Required | Description                                                                                |
+   |---------------|----------|----------------------------------------------------------------------------------------------|
+   | `MONGO_URI`   | Yes      | The connection string used to connect to your MongoDB database (local or hosted).            |
+   | `SECRET_KEY`  | Yes      | The secret used to sign and verify JSON Web Tokens. Use a long, random value.                |
 
 3. Save the `.env` file.
 
-> **Note:** The server will not start if the `.env` file cannot be loaded, and authentication will not work unless `SECRETE_KEY` is set.
+> **Note:** The server will not start if the `.env` file cannot be loaded, and authentication will not work unless `SECRET_KEY` is set.
+
 
 ---
 
@@ -84,7 +89,7 @@ Follow these steps to get the Task Manager API running locally:
 ```
 
 3. **Configure environment variables**
-   Follow the steps in [Environment Setup](#environment-setup) to create your `.env` file with a valid `MONGO_URI` and `SECRETE_KEY`.
+   Follow the steps in [Environment Setup](#environment-setup) to create your `.env` file with a valid `MONGO_URI` and `SECRET_KEY`.
 
 4. **Start MongoDB** (if running locally)
 ```bash
@@ -105,6 +110,62 @@ Follow these steps to get the Task Manager API running locally:
 ```
 
    You can test the connection by sending a request to the [Login User](#2-login-user) or [Register User](#1-register-user) endpoint.
+
+---
+
+## Project Structure
+
+The repository is organized following a layered (Clean Architecture) design:
+
+```
+task_manager/
+├── Delivery/                          # HTTP layer: request/response handling
+│   ├── controllers/
+│   │   ├── task_controller.go         #   Task handlers (add, list, get, update, delete)
+│   │   └── user_controller.go         #   User handlers (register, login)
+│   └── routers/
+│       ├── router.go                  #   Gin engine + public/protected route groups
+│       ├── task_router.go             #   Task routes
+│       └── user_router.go             #   User routes
+├── Domain/                            # Core business types
+│   ├── dto/
+│   │   ├── task_dto.go                #   Task request/response structs
+│   │   └── user_dto.go                #   User request/response structs
+│   └── models/
+│       ├── task.go                    #   Task model (persisted in MongoDB)
+│       └── user.go                    #   User model (persisted in MongoDB)
+├── Infrastructure/                     # External services & cross-cutting concerns
+│   ├── middleware/
+│   │   └── auth_middleware.go         #   JWT authentication middleware
+│   └── utils/
+│       ├── jwt.go                     #   JWT token generation
+│       ├── password.go                #   bcrypt password hashing/verification
+│       └── user_error_handler.go      #   Request validation error handler
+├── Usecases/                          # Application / business logic
+│   ├── task_service.go                #   Task use cases
+│   └── user_service.go                #   User use cases
+├── repository/                        # Data access layer (MongoDB)
+│   ├── db_connenction.go              #   MongoDB connection & collection access
+│   ├── errors.go                      #   Shared sentinel error (ErrNotFound)
+│   ├── task_repository.go             #   Task repository interface + Mongo impl
+│   └── user_repository.go             #   User repository interface + Mongo impl
+├── docs/
+│   └── api_documentation.md           #   This documentation
+├── .env.example                       #   Environment variable template
+├── go.mod                             #   Go module definition & dependencies
+├── go.sum                             #   Dependency checksums
+└── main.go                            #   Entry point: wires everything together
+```
+
+| Layer          | Responsibility                                                                                                 |
+|----------------|-----------------------------------------------------------------------------------------------------------------|
+| `Delivery/`    | Handles incoming HTTP requests, binds/validates JSON bodies, and returns JSON responses (Gin controllers & routes). |
+| `Domain/`      | Defines the core business entities (`models`) and the data-transfer objects (`dto`) exchanged with clients.       |
+| `Usecases/`    | Implements application-specific business rules (task CRUD, user registration/login) on top of the repository.     |
+| `repository/`  | Abstracts MongoDB data access through interfaces, implemented by `MongoTaskRepository` and `MongoUserRepository`. |
+| `Infrastructure/` | Provides cross-cutting services: JWT auth middleware/token generation, bcrypt password utilities, validation errors. |
+
+Dependency flow: `main.go` builds the MongoDB connection, wires repositories → use cases → controllers, and registers the Gin routes in `Delivery/routers/router.go`.
 
 ---
 
@@ -139,27 +200,30 @@ The API uses **JWT (JSON Web Tokens)** for authentication.
 
 ### User Object
 
-A registered user record (returned by the user endpoints):
+A registered user record (returned by the user endpoints). Field names appear **exactly as in the Go response struct** (`UserResponse` has no JSON tags), i.e. PascalCase:
 
 | Field  | Type   | Description                          |
 |--------|--------|---------------------------------------|
-| `id`   | bson.ObjectID | Unique identifier for the user  |
-| `name` | string | Full name of the user                 |
-| `email`| string | Email address used to log in          |
-| `role` | string | Role assigned to the user (e.g. `user`) |
+| `ID`   | string (ObjectID hex) | Unique identifier for the user  |
+| `Name` | string | Full name of the user                 |
+| `Email`| string | Email address used to log in          |
+| `Role` | string | Role assigned to the user (`user`) |
+
+> Internal fields such as the bcrypt `PasswordHash` are never returned. Note that **request** structs (`RegisterRequest`, `LoginRequest`) do carry lowercase `json` tags — responses do not.
 
 ### Task Object
 
-Each task is represented by the following fields:
+Each task is represented by the following fields. As with users, field names are returned in **PascalCase**:
 
 | Field         | Type   | Description                                         |
 |---------------|--------|------------------------------------------------------|
-| `id`          | bson.ObjectID | Unique identifier for the task                       |
-| `title`       | string | Short name or label for the task                     |
-| `description` | string | Detailed information about the task                  |
-| `due_date`    | string | Deadline in `YYYY-MM-DD` format                      |
-| `status`      | string | Current state of the task. New tasks default to `PENDING`. |
-| `owner`          | bson.ObjectID | Unique identifier for the owner of the task                  |
+| `ID`          | string (ObjectID hex) | Unique identifier for the task                       |
+| `Title`       | string | Short name or label for the task                     |
+| `Description` | string | Detailed information about the task                  |
+| `DueDate`     | string | Deadline in `YYYY-MM-DD` format                      |
+| `Status`      | string | Current state of the task. New tasks default to `PENDING`. |
+
+> The `owner` field exists on the persisted `models.Task` (in MongoDB) and is used for ownership checks, but it is **not** exposed in API responses.
 
 ---
 
@@ -195,6 +259,8 @@ POST /api/user/register
 | `email`    | string | Yes      | Valid email address                    |
 | `password` | string | Yes      | Password (min 8 characters)            |
 
+> Validation is enforced via struct binding tags (`required`, `max=50`, `email`, `min=8`). On failure the API returns `400` with a `details` map of per-field messages.
+
 **Example Request**
 
 ```json
@@ -215,14 +281,14 @@ Returns the created user object on success.
 ```json
 201 Created
 {
-    "id": "6a7b6f9fae2bd9a2b42b25e8",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "role": "user"
+    "ID": "6a7b6f9fae2bd9a2b42b25e8",
+    "Name": "John Doe",
+    "Email": "john@example.com",
+    "Role": "user"
 }
 ```
 
-Returns a `400 Bad Request` error if validation fails or the email is already registered.
+Returns `400 Bad Request` if JSON binding or field validation fails (e.g. missing field, name over 50 characters, invalid email, password shorter than 8 characters) or if the email is already registered.
 
 ---
 
@@ -236,10 +302,10 @@ POST /api/user/login
 
 **Request Body**
 
-| Field      | Type   | Required | Description                 |
-|------------|--------|----------|-------------------------------|
-| `email`    | string | Yes      | Registered email address    |
-| `password` | string | Yes      | Account password            |
+| Field      | Type   | Required | Description                        |
+|------------|--------|----------|-------------------------------------|
+| `email`    | string | Yes      | Registered email address (must be a valid email) |
+| `password` | string | Yes      | Account password                   |
 
 **Example Request**
 
@@ -270,7 +336,7 @@ Use the returned token in the `Authorization` header for all task endpoints:
 Authorization: Bearer <token>
 ```
 
-Returns `401 Unauthorized` for invalid credentials.
+Returns `400 Bad Request` if JSON binding or validation fails (e.g. missing or invalid email/password), and `401 Unauthorized` if the email is not registered or the password is incorrect.
 
 ---
 
@@ -309,16 +375,16 @@ Content-Type: application/json
 
 **Response**
 
-Returns the created task object on success.
+Returns the created task object on success. Note the response keys are PascalCase (`ID`, `DueDate`, etc.) as exposed by the DTO.
 
 ```json
 201 Created
 {
-    "id": "6a78360b8e4cf6d96c48d993",
-    "title": "Prepare project report",
-    "description": "Compile weekly progress summary",
-    "due_date": "2026-11-10",
-    "status": "PENDING"
+    "ID": "6a78360b8e4cf6d96c48d993",
+    "Title": "Prepare project report",
+    "Description": "Compile weekly progress summary",
+    "DueDate": "2026-11-10",
+    "Status": "PENDING"
 }
 ```
 
@@ -353,18 +419,18 @@ Returns an object containing an array of the current user's task objects.
 {
     "tasks": [
         {
-            "id": "6a78360b8e4cf6d96c48d993",
-            "title": "Prepare project report",
-            "description": "Compile weekly progress summary",
-            "due_date": "2026-11-10",
-            "status": "PENDING"
+            "ID": "6a78360b8e4cf6d96c48d993",
+            "Title": "Prepare project report",
+            "Description": "Compile weekly progress summary",
+            "DueDate": "2026-11-10",
+            "Status": "PENDING"
         },
         {
-            "id": "6a78360b8e4cf6d96c48d994",
-            "title": "Task 1",
-            "description": "First task",
-            "due_date": "2026-10-11",
-            "status": "completed"
+            "ID": "6a78360b8e4cf6d96c48d994",
+            "Title": "Task 1",
+            "Description": "First task",
+            "DueDate": "2026-10-11",
+            "Status": "completed"
         }
     ]
 }
@@ -385,7 +451,7 @@ Authorization: Bearer <token>
 
 | Parameter | Type   | Description                       |
 |-----------|--------|------------------------------------|
-| `id`      | bson.ObjectID | The unique identifier of the task |
+| `id`      | string (ObjectID hex) | The unique identifier of the task |
 
 **Example Request**
 
@@ -402,11 +468,11 @@ Returns the full task object.
 200 OK
 {
     "task": {
-        "id": "6a78360b8e4cf6d96c48d994",
-        "title": "Task 1",
-        "description": "First task",
-        "due_date": "2026-10-11",
-        "status": "completed"
+        "ID": "6a78360b8e4cf6d96c48d994",
+        "Title": "Task 1",
+        "Description": "First task",
+        "DueDate": "2026-10-11",
+        "Status": "completed"
     }
 }
 ```
@@ -428,7 +494,7 @@ Authorization: Bearer <token>
 
 | Parameter | Type   | Description                       |
 |-----------|--------|------------------------------------|
-| `id`      | bson.ObjectID | The unique identifier of the task |
+| `id`      | string (ObjectID hex) | The unique identifier of the task |
 
 **Request Body**
 
@@ -460,16 +526,16 @@ Returns the updated task object on success.
 200 OK
 {
     "task": {
-        "id": "6a78360b8e4cf6d96c48d993",
-        "title": "Prepare project report",
-        "description": "Compile weekly progress summary",
-        "due_date": "2026-11-10",
-        "status": "completed"
+        "ID": "6a78360b8e4cf6d96c48d993",
+        "Title": "Prepare project report",
+        "Description": "Compile weekly progress summary",
+        "DueDate": "2026-11-10",
+        "Status": "completed"
     }
 }
 ```
 
-Returns `404 Not Found` if the task does not exist, and `401 Unauthorized` if the task belongs to another user.
+Returns `404 Not Found` if the task does not exist, and `401 Unauthorized` if the task belongs to another user. Also returns `400 Bad Request` for a malformed request body, and `404 Not Found` if the body contains **no** updateable fields.
 
 ---
 
@@ -486,7 +552,7 @@ Authorization: Bearer <token>
 
 | Parameter | Type   | Description                       |
 |-----------|--------|------------------------------------|
-| `id`      | bson.ObjectID | The unique identifier of the task |
+| `id`      | string (ObjectID hex) | The unique identifier of the task |
 
 **Request Body:** None
 

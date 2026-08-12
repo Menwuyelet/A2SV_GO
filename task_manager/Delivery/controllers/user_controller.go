@@ -2,18 +2,18 @@ package controllers
 
 import (
 	"net/http"
-	"task_manager/data"
-	"task_manager/dto"
-	"task_manager/utils"
+	"task_manager/Domain/dto"
+	"task_manager/Infrastructure/utils"
+	"task_manager/Usecases"
 
 	"github.com/gin-gonic/gin"
 )
 
 type UserController struct {
-	service *data.UserService
+	service *Usecases.UserService
 }
 
-func NewUserController(service *data.UserService) *UserController {
+func NewUserController(service *Usecases.UserService) *UserController {
 	return &UserController{service: service}
 }
 

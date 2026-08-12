@@ -5,17 +5,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/joho/godotenv"
 )
 
-var SecretKey = os.Getenv("SECRETE_KEY")
-
-func init() {
-	_ = godotenv.Load()
-	SecretKey = os.Getenv("SECRETE_KEY")
-}
-
 func GenerateToken(userID, role string) (string, error) {
+	var SecretKey = os.Getenv("SECRET_KEY")
+
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"role":    role,

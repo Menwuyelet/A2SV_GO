@@ -1,15 +1,14 @@
-package data
+package Usecases
 
 import (
 	"context"
 	"errors"
-	"task_manager/dto"
-	"task_manager/models"
+	"task_manager/Domain/dto"
+	"task_manager/Domain/models"
+	"task_manager/Infrastructure/utils"
 	"task_manager/repository"
-	"task_manager/utils"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type UserService struct {
@@ -27,7 +26,7 @@ func (us *UserService) Register(ctx context.Context, req dto.RegisterRequest) (d
 		return dto.UserResponse{}, errors.New("Email already taken.")
 	}
 
-	if !errors.Is(err, mongo.ErrNoDocuments) {
+	if !errors.Is(err, repository.ErrNotFound) {
 		return dto.UserResponse{}, err
 	}
 
@@ -54,7 +53,7 @@ func (us *UserService) Register(ctx context.Context, req dto.RegisterRequest) (d
 	}
 
 	Newuser := dto.UserResponse{
-		ID:    user.ID,
+		ID:    user.ID.Hex(),
 		Name:  user.Name,
 		Email: user.Email,
 		Role:  user.Role,
