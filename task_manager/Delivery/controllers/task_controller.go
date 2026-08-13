@@ -10,10 +10,10 @@ import (
 )
 
 type TaskController struct {
-	service *Usecases.TaskService
+	service Usecases.TaskUsecase
 }
 
-func NewTaskController(service *Usecases.TaskService) *TaskController {
+func NewTaskController(service Usecases.TaskUsecase) *TaskController {
 	return &TaskController{service: service}
 }
 

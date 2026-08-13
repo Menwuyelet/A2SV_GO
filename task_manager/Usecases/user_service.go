@@ -11,6 +11,11 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+type UserUsecase interface {
+	Register(ctx context.Context, req dto.RegisterRequest) (dto.UserResponse, error)
+	Login(ctx context.Context, req dto.LoginRequest) (string, error)
+}
+
 type UserService struct {
 	repo repository.UserRepository
 }

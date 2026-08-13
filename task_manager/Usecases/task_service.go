@@ -10,6 +10,14 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+type TaskUsecase interface {
+	AddTask(ctx context.Context, task dto.TaskRequest, owner string) (dto.TaskResponse, error)
+	ListTasks(ctx context.Context, owner string) ([]dto.TaskResponse, error)
+	GetTask(ctx context.Context, id string, owner string) (dto.TaskResponse, error)
+	UpdateTask(ctx context.Context, id string, owner string, updatedTask dto.TaskUpdateRequest) (dto.TaskResponse, error)
+	DeleteTask(ctx context.Context, id string, owner string) error
+}
+
 type TaskService struct {
 	repo repository.TaskRepository
 }
