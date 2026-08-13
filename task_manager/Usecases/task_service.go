@@ -60,17 +60,9 @@ func (ts *TaskService) ListTasks(ctx context.Context, owner string) ([]dto.TaskR
 		return nil, err
 	}
 
-	var tasks []models.Task
-
-	cursor, err := ts.repo.List(ctx, ownerID)
+	tasks, err := ts.repo.List(ctx, ownerID)
 
 	if err != nil {
-		return nil, err
-	}
-
-	defer cursor.Close(ctx)
-
-	if err := cursor.All(ctx, &tasks); err != nil {
 		return nil, err
 	}
 

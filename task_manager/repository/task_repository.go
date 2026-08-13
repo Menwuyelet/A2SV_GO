@@ -10,7 +10,7 @@ import (
 
 type TaskRepository interface {
 	Create(ctx context.Context, task models.Task) (bool, error)
-	List(ctx context.Context, ownerID bson.ObjectID) (*mongo.Cursor, error)
+	List(ctx context.Context, ownerID bson.ObjectID) ([]models.Task, error)
 	Get(ctx context.Context, objectID bson.ObjectID) (models.Task, error)
 	Update(ctx context.Context, objectID bson.ObjectID, set bson.M) (bool, error)
 	Delete(ctx context.Context, objectID bson.ObjectID) (bool, error)
@@ -34,15 +34,18 @@ func (t *MongoTaskRepository) Create(ctx context.Context, task models.Task) (boo
 	return res.Acknowledged, nil
 }
 
-func (t *MongoTaskRepository) List(ctx context.Context, ownerID bson.ObjectID) (*mongo.Cursor, error) {
-	filter := bson.M{"owner": ownerID}
-
-	cursor, err := t.collection.Find(ctx, filter)
+func (t *MongoTaskRepository) List(ctx context.Context, ownerID bson.ObjectID) ([]models.Task, error) {
+	cursor, err := t.collection.Find(ctx, bson.M{"owner": ownerID})
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
 
-	return cursor, nil
+	var tasks []models.Task
+	if err := cursor.All(ctx, &tasks); err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
 
 func (t *MongoTaskRepository) Get(ctx context.Context, objectID bson.ObjectID) (models.Task, error) {
