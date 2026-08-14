@@ -122,7 +122,9 @@ task_manager/
 ├── Delivery/                          # HTTP layer: request/response handling
 │   ├── controllers/
 │   │   ├── task_controller.go         #   Task handlers (add, list, get, update, delete)
-│   │   └── user_controller.go         #   User handlers (register, login)
+│   │   ├── task_controller_test.go    #   Unit tests for task handlers
+│   │   ├── user_controller.go         #   User handlers (register, login)
+│   │   └── user_controller_test.go    #   Unit tests for user handlers
 │   └── routers/
 │       ├── router.go                  #   Gin engine + public/protected route groups
 │       ├── task_router.go             #   Task routes
@@ -143,15 +145,23 @@ task_manager/
 │       └── user_error_handler.go      #   Request validation error handler
 ├── Usecases/                          # Application / business logic
 │   ├── task_service.go                #   Task use cases
-│   └── user_service.go                #   User use cases
+│   ├── task_service_test.go           #   Unit tests for task service
+│   ├── user_service.go                #   User use cases
+│   └── user_service_test.go           #   Unit tests for user service
 ├── repository/                        # Data access layer (MongoDB)
 │   ├── db_connenction.go              #   MongoDB connection & collection access
 │   ├── errors.go                      #   Shared sentinel error (ErrNotFound)
 │   ├── task_repository.go             #   Task repository interface + Mongo impl
 │   └── user_repository.go             #   User repository interface + Mongo impl
+├── Mocks/                             # Generated mocks for unit testing
+│   ├── mock_UserRepository.go         #   Mock for the UserRepository interface
+│   ├── TaskRepositoryMock.go          #   Mock for the TaskRepository interface
+│   ├── TaskUsecaseMock.go             #   Mock for the TaskUsecase interface
+│   └── UserUsecaseMock.go             #   Mock for the UserUsecase interface
 ├── docs/
 │   └── api_documentation.md           #   This documentation
 ├── .env.example                       #   Environment variable template
+├── .mockery.yaml                      #   Mockery config (generates Mocks/)
 ├── go.mod                             #   Go module definition & dependencies
 ├── go.sum                             #   Dependency checksums
 └── main.go                            #   Entry point: wires everything together
@@ -164,6 +174,7 @@ task_manager/
 | `Usecases/`    | Implements application-specific business rules (task CRUD, user registration/login) on top of the repository.     |
 | `repository/`  | Abstracts MongoDB data access through interfaces, implemented by `MongoTaskRepository` and `MongoUserRepository`. |
 | `Infrastructure/` | Provides cross-cutting services: JWT auth middleware/token generation, bcrypt password utilities, validation errors. |
+| `Mocks/`        | Mock implementations of the repository and usecase interfaces, used by the unit tests. |
 
 Dependency flow: `main.go` builds the MongoDB connection, wires repositories → use cases → controllers, and registers the Gin routes in `Delivery/routers/router.go`.
 
@@ -535,7 +546,7 @@ Returns the updated task object on success.
 }
 ```
 
-Returns `404 Not Found` if the task does not exist, and `401 Unauthorized` if the task belongs to another user. Also returns `400 Bad Request` for a malformed request body, and `404 Not Found` if the body contains **no** updateable fields.
+Returns `404 Not Found` if the task does not exist, and `401 Unauthorized` if the task belongs to another user. Returns `400 Bad Request` for a malformed request body. All other service errors (including when the body contains no updateable fields) return `404 Not Found`.
 
 ---
 
